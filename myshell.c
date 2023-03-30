@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <signal.h>
+#include <envz.h>
 
 char command[1024];
 char copy_command[1024];
@@ -15,7 +16,7 @@ char *history[20];
 char *token;
 char *outfile;
 bool amper, redirect, piping, retid, outerr, concat;
-int i, status, argc, fd, history_index, numOfPipes = 0;
+int i, status, argc, fd, history_index, numOfPipes;
 int fildes[2];
 char *argv1[10], *argv2[10];
 char *cursor = "hello:";
@@ -196,6 +197,8 @@ void sigintHandler()
     signal(SIGTSTP, stop_signal);
     killpg(pgid, SIGTSTP);
     printf("\nYou typed Control-C! \n");
+    printf("%s ", cursor);
+    fflush(stdout);
 }
 
 /* This function is handeling the | (piping) command*/
@@ -230,12 +233,13 @@ int read_command()
     {
         char words[2][1024];
         fgets(command, 1024, stdin);
+        command[strlen(command) - 1] = 0;
         sscanf(command, "%s %s", words[0], words[1]);
         if (!strcmp(words[0], "read"))
         {
-            char *var = argv1[1];
+            char *var = words[1];
             char *value = (char *)malloc(sizeof(char) * 1024);
-            scanf("%s", value);
+            fgets(value, 1024, stdin);
             setenv(var, value, 1);
             return 1;
         }
@@ -315,7 +319,7 @@ int main()
         printf("%s ", cursor);
         fgets(command, 1024, stdin);
         command[strlen(command) - 1] = '\0';
-        piping = false;
+        numOfPipes = 0;
 
         /* parse command line */
         parseCommandLine();
@@ -408,13 +412,23 @@ int main()
                 close(fd);
                 /* stdout is now redirected */
             }
-            if (concat)
+            else if (concat)
             {
                 fd = open(outfile, O_RDWR | O_CREAT | O_APPEND, 0660);
                 close(STDOUT_FILENO);
                 dup(fd);
                 close(fd);
                 /* stdout is now redirected */
+            }
+            else if (outerr)
+            {
+                // redirect to stderr
+                fd = creat(outfile, 0660);
+                close(STDERR_FILENO);
+                dup(fd);
+                close(fd);
+                /* stderr is now redirected */
+                //  execvp(argv1[0], argv1);
             }
             if (piping)
             {
@@ -437,16 +451,6 @@ int main()
                 close(fildes[1]);
                 /* standard input now comes from pipe */
                 execvp(argv2[0], argv2);
-            }
-            else if (outerr)
-            {
-                // redirect to stderr
-                fd = creat(outfile, 0660);
-                close(STDERR_FILENO);
-                dup(fd);
-                close(fd);
-                /* stderr is now redirected */
-                execvp(argv1[0], argv1);
             }
             else
                 execvp(argv1[0], argv1);

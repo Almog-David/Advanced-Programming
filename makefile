@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -Werror -pedantic
+CFLAGS=-Wall -Wextra -Werror -pedantic -g
 
 myshell: myshell.o
 	$(CC) $(CFLAGS) -o myshell myshell.o
