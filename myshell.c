@@ -16,7 +16,7 @@ char *history[20];
 char *token;
 char *outfile;
 bool amper, redirect, piping, retid, outerr, concat;
-int i, status, argc, fd, history_index, numOfPipes;
+int i, status, argc, fd, first_index, last_index, numOfPipes;
 int fildes[2];
 char *argv1[10], *argv2[10];
 char *cursor = "hello:";
@@ -56,18 +56,20 @@ void check_amper()
 /* this function add the last commans to the history array in order to let us see the last command or go through them*/
 void add_to_history()
 {
-    int index = history_index % 20;
+    int index = last_index % 20;
     if (history[index] == NULL)
     {
         /* this doesnt work because its saves only the first word*/
         history[index] = strdup(copy_command);
+        last_index = (last_index + 1) % 20;
     }
     else
     {
         free(history[index]);
         history[index] = strdup(copy_command);
+        last_index = (last_index + 1) % 20;
+        first_index = (first_index + 1) % 20;
     }
-    history_index++;
 }
 
 /* This function is handeling the > command and the >> command*/
@@ -250,58 +252,54 @@ int read_command()
 
 int search_history()
 {
-    int current_index = (history_index - 1) % 20;
+    int current_index;
     int ans = 0;
     if ((argc == 1) && (argv1[0][2] == 'A' || argv1[0][2] == 'B'))
     {
-        printf("%s", history[(current_index) % 20]);
-        ans = 1;
-        int c;
-        while ((c = getchar()) != 'Q')
+        current_index = (last_index - 1) % 20;
+        if (history[current_index] != NULL)
         {
-            if (c == '\033')
+            printf("%s", history[(current_index) % 20]);
+            ans = 1;
+            int c;
+            while ((c = getchar()) != 'Q')
             {
-                printf("\033[1A"); // line up
-                printf("\x1b[2K"); // delete line
-                getchar();
-                switch (getchar())
+                if (c == '\033')
                 {
-                case 'A': /* UP arrow */
-                    if (history[(current_index - 1) % 20] == NULL)
+                    printf("\033[1A"); // line up
+                    printf("\x1b[2K"); // delete line
+                    getchar();
+                    switch (getchar())
                     {
-                        printf("%s", history[(current_index) % 20]);
-                    }
-                    else if (current_index % 20 == history_index % 20)
-                    {
-                        current_index = (current_index + 1) % 20;
-                        printf("%s", history[(current_index) % 20]);
-                    }
-                    else
-                    {
-                        current_index = (current_index - 1) % 20;
-                        printf("%s", history[current_index]);
-                    }
-                    break;
+                    case 'A': /* UP arrow */
+                        if (current_index % 20 == first_index % 20)
+                        {
+                            printf("%s", history[(current_index) % 20]);
+                            break;
+                        }
+                        else
+                        {
+                            current_index = (current_index - 1) % 20;
+                            printf("%s", history[current_index]);
+                            break;
+                        }
 
-                case 'B': /* DOWN arrow*/
-                    if ((current_index + 1) % 20 == history_index % 20)
-                    {
-                        printf("%s", history[(current_index) % 20]);
-                    }
-                    // else if (current_index % 20 == history_index)
-                    // {
-                    //     current_index = (current_index - 1) % 20;
-                    //     printf("%s", history[(history_index) % 20]);
-                    // }
-                    else
-                    {
-                        current_index = (current_index + 1) % 20;
-                        printf("%s", history[current_index]);
-                    }
-                    break;
+                    case 'B': /* DOWN arrow*/
+                        if ((current_index + 1) % 20 == last_index % 20)
+                        {
+                            printf("%s", history[(current_index % 20)]);
+                            break;
+                        }
+                        else
+                        {
+                            current_index = (current_index + 1) % 20;
+                            printf("%s", history[current_index]);
+                            break;
+                        }
 
-                default:
-                    break;
+                    default:
+                        break;
+                    }
                 }
             }
         }
@@ -312,7 +310,7 @@ int search_history()
 int main()
 {
     int ans;
-    history_index = 0;
+    first_index = 0, last_index = 0;
     signal(SIGINT, sigintHandler);
     while (true)
     {
@@ -331,17 +329,23 @@ int main()
         /* Is command is !! check the last command and do it again */
         if (argc == 1 && !strcmp(argv1[0], "!!"))
         {
-            if (history_index == 0)
+            if (history[first_index] == NULL)
             {
                 printf("there is no history to the shell \n");
             }
             else
             {
-                int index = (history_index - 1) % 20;
+                int index = (last_index - 1) % 20;
                 memset(command, 0, sizeof(command));
                 strcpy(command, history[index]);
                 parseCommandLine();
             }
+        }
+
+        ans = search_history();
+        if (ans == 1)
+        {
+            continue;
         }
 
         add_to_history();
