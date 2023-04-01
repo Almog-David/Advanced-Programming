@@ -15,15 +15,16 @@ char copy_command[1024];
 char *history[20];
 char *token;
 char *outfile;
-bool amper, redirect, piping, retid, outerr, concat;
+bool amper, redirect, retid, got_pipe, outerr, concat;
 int i, status, argc, fd, first_index, last_index, numOfPipes;
 int fildes[2];
-char *argv1[10], *argv2[10];
+char *argv1[10], *pipe_command[10][10];
 char *cursor = "hello:";
 int main();
 
 void parseCommandLine()
 {
+    got_pipe = false;
     i = 0;
     strcpy(copy_command, command);
     token = strtok(command, " ");
@@ -33,8 +34,8 @@ void parseCommandLine()
         token = strtok(NULL, " ");
         if (token && !strcmp(token, "|"))
         {
-            piping = true;
-            break;
+            got_pipe = true;
+            numOfPipes++;
         }
     }
     argv1[i] = NULL;
@@ -204,21 +205,81 @@ void sigintHandler()
 }
 
 /* This function is handeling the | (piping) command*/
-void check_piping()
+void piping()
 {
-    if (piping)
+    int prev_pipe = STDIN_FILENO;
+    for (i = 0; i < numOfPipes; i++)
     {
-        i = 0;
-        while (token != NULL)
+        pipe(fildes);
+        if (fork() == 0)
         {
-            token = strtok(NULL, " ");
-            argv2[i] = token;
-            i++;
+            // Redirect previous pipe to stdin
+            if (prev_pipe != STDIN_FILENO)
+            {
+                dup2(prev_pipe, STDIN_FILENO);
+                close(prev_pipe);
+            }
+
+            // Redirect stdout to current pipe
+            dup2(fildes[1], STDOUT_FILENO);
+            close(fildes[1]);
+
+            // Start command
+            execvp(pipe_command[i][0], pipe_command[i]);
+
+            perror("execvp failed");
+            exit(1);
         }
-        argv2[i] = NULL;
+
+        // Close read end of previous pipe (not needed in the parent)
+        close(prev_pipe);
+
+        // Close write end of current pipe (not needed in the parent)
+        close(fildes[1]);
+
+        // Save read end of current pipe to use in next iteration
+        prev_pipe = fildes[0];
     }
+
+    // Get stdin from last pipe
+    if (prev_pipe != STDIN_FILENO)
+    {
+        dup2(prev_pipe, STDIN_FILENO);
+        close(prev_pipe);
+    }
+
+    // Start last command
+    execvp(pipe_command[i][0], pipe_command[i]);
+
+    perror("execvp failed");
+    exit(1);
 }
 
+void check_piping()
+{
+    if (numOfPipes > 0)
+    {
+        i = 0;
+        int row = 0, colm = 0;
+        while (argv1[i] != NULL)
+        {
+            if (!strcmp(argv1[i], "|"))
+            {
+                pipe_command[row][colm] = NULL;
+                row++;
+                colm = 0;
+            }
+            else
+            {
+                pipe_command[row][colm] = argv1[i];
+                colm++;
+            }
+            i++;
+        }
+        pipe_command[row][colm] = NULL;
+        piping();
+    }
+}
 int variable()
 {
     if (argc == 3 && !strcmp(argv1[1], "=") && argv1[0][0] == '$')
@@ -416,7 +477,7 @@ int main()
                 close(fd);
                 /* stdout is now redirected */
             }
-            else if (concat)
+            if (concat)
             {
                 fd = open(outfile, O_RDWR | O_CREAT | O_APPEND, 0660);
                 close(STDOUT_FILENO);
@@ -424,7 +485,7 @@ int main()
                 close(fd);
                 /* stdout is now redirected */
             }
-            else if (outerr)
+            if (outerr)
             {
                 // redirect to stderr
                 fd = creat(outfile, 0660);
@@ -432,29 +493,30 @@ int main()
                 dup(fd);
                 close(fd);
                 /* stderr is now redirected */
-                //  execvp(argv1[0], argv1);
+                execvp(argv1[0], argv1);
             }
-            if (piping)
+            if (got_pipe)
             {
-                pipe(fildes);
-                if (fork() == 0)
-                {
-                    /* first component of command line */
-                    close(STDOUT_FILENO);
-                    dup(fildes[1]);
-                    close(fildes[1]);
-                    close(fildes[0]);
-                    /* stdout now goes to pipe */
-                    /* child process does command */
-                    execvp(argv1[0], argv1);
-                }
-                /* 2nd command component of command line */
-                close(STDIN_FILENO);
-                dup(fildes[0]);
-                close(fildes[0]);
-                close(fildes[1]);
-                /* standard input now comes from pipe */
-                execvp(argv2[0], argv2);
+                continue;
+                // pipe(fildes);
+                // if (fork() == 0)
+                // {
+                //     /* first component of command line */
+                //     close(STDOUT_FILENO);
+                //     dup(fildes[1]);
+                //     close(fildes[1]);
+                //     close(fildes[0]);
+                //     /* stdout now goes to pipe */
+                //     /* child process does command */
+                //     execvp(argv1[0], argv1);
+                // }
+                // /* 2nd command component of command line */
+                // close(STDIN_FILENO);
+                // dup(fildes[0]);
+                // close(fildes[0]);
+                // close(fildes[1]);
+                // /* standard input now comes from pipe */
+                // execvp(pipe_command[0][0], pipe_command[0]);
             }
             else
                 execvp(argv1[0], argv1);
