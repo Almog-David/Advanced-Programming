@@ -226,9 +226,6 @@ void piping()
 
             // Start command
             execvp(pipe_command[i][0], pipe_command[i]);
-
-            perror("execvp failed");
-            exit(1);
         }
 
         // Close read end of previous pipe (not needed in the parent)
@@ -250,9 +247,6 @@ void piping()
 
     // Start last command
     execvp(pipe_command[i][0], pipe_command[i]);
-
-    perror("execvp failed");
-    exit(1);
 }
 
 void check_piping()
