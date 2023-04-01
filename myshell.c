@@ -303,6 +303,7 @@ int read_command()
             char *var = words[1];
             char *value = (char *)malloc(sizeof(char) * 1024);
             fgets(value, 1024, stdin);
+            value[strcspn(value, "\n")] = '\0';
             setenv(var, value, 1);
             return 1;
         }
