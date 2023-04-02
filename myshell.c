@@ -338,70 +338,66 @@ int read_command()
 
 int search_history()
 {
-    int current_index;
+    int current_index = (last_index - 1) % 20;
     int ans = 0;
-    if ((argc == 1) && (argv1[0][2] == 'A' || argv1[0][2] == 'B'))
+    if ((argc == 1) && (history[current_index] != NULL) && (argv1[0][2] == 'A' || argv1[0][2] == 'B'))
     {
-        current_index = (last_index - 1) % 20;
-        if (history[current_index] != NULL)
+        printf("\033[1A"); // line up
+        printf("\x1b[2K"); // delete line
+        printf("%s", history[(current_index) % 20]);
+        ans = 1;
+        int c;
+        while (c != 'Q')
         {
-            printf("\033[1A"); // line up
-            printf("\x1b[2K"); // delete line
-            printf("%s", history[(current_index) % 20]);
-            ans = 1;
-            int c;
-            while (c != 'Q')
+            c = getchar();
+
+            if (c == '\033')
             {
-                c = getchar();
-
-                if (c == '\033')
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                getchar();
+                switch (getchar())
                 {
-                    printf("\033[1A"); // line up
-                    printf("\x1b[2K"); // delete line
-                    getchar();
-                    switch (getchar())
+                case 'A': /* UP arrow */
+                    if (getchar() == '\n')
                     {
-                    case 'A': /* UP arrow */
-                        if (getchar() == '\n')
+                        if (current_index % 20 == first_index % 20)
                         {
-                            if (current_index % 20 == first_index % 20)
-                            {
-                                printf("%s", history[(current_index) % 20]);
-                            }
-                            else
-                            {
-                                current_index = (current_index - 1) % 20;
-                                printf("%s", history[current_index]);
-                            }
+                            printf("%s", history[(current_index) % 20]);
                         }
-                        break;
-
-                    case 'B': /* DOWN arrow*/
-                        if (getchar() == '\n')
+                        else
                         {
-                            if ((current_index + 1) % 20 == last_index % 20)
-                            {
-                                printf("%s", history[(current_index % 20)]);
-                            }
-                            else
-                            {
-                                current_index = (current_index + 1) % 20;
-                                printf("%s", history[current_index]);
-                            }
+                            current_index = (current_index - 1) % 20;
+                            printf("%s", history[current_index]);
                         }
-                        break;
-                    default:
-                        break;
                     }
+                    break;
+
+                case 'B': /* DOWN arrow*/
+                    if (getchar() == '\n')
+                    {
+                        if ((current_index + 1) % 20 == last_index % 20)
+                        {
+                            printf("%s", history[(current_index % 20)]);
+                        }
+                        else
+                        {
+                            current_index = (current_index + 1) % 20;
+                            printf("%s", history[current_index]);
+                        }
+                    }
+                    break;
+                default:
+                    break;
                 }
-                else if (c == '\n')
-                {
-                    memset(command, 0, sizeof(command));
-                    strcpy(command, history[current_index]);
-                    execute();
-                    current_index = (last_index - 1) % 20;
-                    printf("%s", history[current_index]);
-                }
+            }
+            else if (c == '\n') /* if the user press Enter - repeat the command*/
+            {
+                memset(command, 0, sizeof(command));
+                strcpy(command, history[current_index]);
+                execute();
+                current_index = (last_index - 1) % 20;
+                printf("%s", history[current_index]);
             }
         }
     }
