@@ -18,7 +18,7 @@ char *outfile;
 bool amper, redirect, retid, got_pipe, outerr, concat;
 int i, status, argc, fd, first_index, last_index, numOfPipes;
 int fildes[2];
-char *argv1[10], *pipe_command[10][10];
+char *argv1[10], ***pipe_command;
 char *cursor = "hello:";
 int main();
 
@@ -227,7 +227,11 @@ void piping()
             close(fildes[1]);
 
             // Start command
-            execvp(pipe_command[i][0], pipe_command[i]);
+            if (execvp(pipe_command[i][0], pipe_command[i]) == -1)
+            {
+                fprintf(stderr, "Error executing command: %s\n", strerror(errno));
+                _exit(1);
+            }
         }
 
         // Close read end of previous pipe (not needed in the parent)
@@ -239,7 +243,6 @@ void piping()
         // Save read end of current pipe to use in next iteration
         prev_pipe = fildes[0];
     }
-
     // Get stdin from last pipe
     if (prev_pipe != STDIN_FILENO)
     {
@@ -248,7 +251,11 @@ void piping()
     }
 
     // Start last command
-    execvp(pipe_command[i][0], pipe_command[i]);
+    if (execvp(pipe_command[i][0], pipe_command[i]) == -1)
+    {
+        fprintf(stderr, "Error executing command: %s\n", strerror(errno));
+        exit(1);
+    }
 }
 
 void check_piping()
@@ -257,6 +264,15 @@ void check_piping()
     {
         i = 0;
         int row = 0, colm = 0;
+        int max_rows = numOfPipes + 1;
+        int max_colm = 10;
+
+        pipe_command = malloc(max_rows * sizeof(char **));
+        for (int i = 0; i < max_rows; i++)
+        {
+            pipe_command[i] = malloc(max_colm * sizeof(char *));
+        }
+
         while (argv1[i] != NULL)
         {
             if (!strcmp(argv1[i], "|"))
@@ -267,15 +283,27 @@ void check_piping()
             }
             else
             {
-                pipe_command[row][colm] = argv1[i];
+                pipe_command[row][colm] = malloc((strlen(argv1[i]) + 1) * sizeof(char));
+                strcpy(pipe_command[row][colm], argv1[i]);
                 colm++;
             }
             i++;
         }
         pipe_command[row][colm] = NULL;
         piping();
+
+        for (int i = 0; i < max_rows; i++)
+        {
+            for (int j = 0; j < max_colm; j++)
+            {
+                free(pipe_command[i][j]);
+            }
+            free(pipe_command[i]);
+        }
+        free(pipe_command);
     }
 }
+
 int variable()
 {
     if (argc == 3 && !strcmp(argv1[1], "=") && argv1[0][0] == '$')
@@ -485,29 +513,6 @@ void execute()
             /* stderr is now redirected */
             execvp(argv1[0], argv1);
         }
-        // if (got_pipe)
-        // {
-        //     return;
-        // pipe(fildes);
-        // if (fork() == 0)
-        // {
-        //     /* first component of command line */
-        //     close(STDOUT_FILENO);
-        //     dup(fildes[1]);
-        //     close(fildes[1]);
-        //     close(fildes[0]);
-        //     /* stdout now goes to pipe */
-        //     /* child process does command */
-        //     execvp(argv1[0], argv1);
-        // }
-        // /* 2nd command component of command line */
-        // close(STDIN_FILENO);
-        // dup(fildes[0]);
-        // close(fildes[0]);
-        // close(fildes[1]);
-        // /* standard input now comes from pipe */
-        // execvp(pipe_command[0][0], pipe_command[0]);
-        // }
         else
             execvp(argv1[0], argv1);
     }
