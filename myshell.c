@@ -22,6 +22,8 @@ char *argv1[10], *pipe_command[10][10];
 char *cursor = "hello:";
 int main();
 
+void execute();
+
 void parseCommandLine()
 {
     got_pipe = false;
@@ -315,11 +317,15 @@ int search_history()
         current_index = (last_index - 1) % 20;
         if (history[current_index] != NULL)
         {
+            printf("\033[1A"); // line up
+            printf("\x1b[2K"); // delete line
             printf("%s", history[(current_index) % 20]);
             ans = 1;
             int c;
-            while ((c = getchar()) != 'Q')
+            while (c != 'Q')
             {
+                c = getchar();
+
                 if (c == '\033')
                 {
                     printf("\033[1A"); // line up
@@ -328,34 +334,45 @@ int search_history()
                     switch (getchar())
                     {
                     case 'A': /* UP arrow */
-                        if (current_index % 20 == first_index % 20)
+                        if (getchar() == '\n')
                         {
-                            printf("%s", history[(current_index) % 20]);
-                            break;
+                            if (current_index % 20 == first_index % 20)
+                            {
+                                printf("%s", history[(current_index) % 20]);
+                            }
+                            else
+                            {
+                                current_index = (current_index - 1) % 20;
+                                printf("%s", history[current_index]);
+                            }
                         }
-                        else
-                        {
-                            current_index = (current_index - 1) % 20;
-                            printf("%s", history[current_index]);
-                            break;
-                        }
+                        break;
 
                     case 'B': /* DOWN arrow*/
-                        if ((current_index + 1) % 20 == last_index % 20)
+                        if (getchar() == '\n')
                         {
-                            printf("%s", history[(current_index % 20)]);
-                            break;
+                            if ((current_index + 1) % 20 == last_index % 20)
+                            {
+                                printf("%s", history[(current_index % 20)]);
+                            }
+                            else
+                            {
+                                current_index = (current_index + 1) % 20;
+                                printf("%s", history[current_index]);
+                            }
                         }
-                        else
-                        {
-                            current_index = (current_index + 1) % 20;
-                            printf("%s", history[current_index]);
-                            break;
-                        }
-
+                        break;
                     default:
                         break;
                     }
+                }
+                else if (c == '\n')
+                {
+                    memset(command, 0, sizeof(command));
+                    strcpy(command, history[current_index]);
+                    execute();
+                    current_index = (last_index - 1) % 20;
+                    printf("%s", history[current_index]);
                 }
             }
         }
@@ -363,9 +380,146 @@ int search_history()
     return ans;
 }
 
+void execute()
+{
+    /* parse command line */
+    parseCommandLine();
+
+    /* Is command empty */
+    if (argv1[0] == NULL)
+        return;
+
+    /* Is command is !! check the last command and do it again */
+    if (argc == 1 && !strcmp(argv1[0], "!!"))
+    {
+        if (history[first_index] == NULL)
+        {
+            printf("there is no history to the shell \n");
+        }
+        else
+        {
+            int index = (last_index - 1) % 20;
+            memset(command, 0, sizeof(command));
+            strcpy(command, history[index]);
+            parseCommandLine();
+        }
+    }
+
+    if (search_history())
+    {
+        return;
+    }
+
+    add_to_history();
+    /* Does command contain pipe */
+    check_piping();
+
+    /* Does command line end with & */
+    check_amper();
+
+    /* Does command line end with > */
+    redirection();
+
+    /* Does command line end with 2> */
+    handel_stderr();
+
+    /* Does command line start with prompt */
+    if (change_cursor())
+    {
+        return;
+    }
+
+    /* Does command line start with read */
+    if (read_command())
+    {
+        return;
+    }
+
+    /* Does command line start with echo */
+    if (echo())
+    {
+        return;
+    }
+
+    /* Does command line start with cd */
+    if (cd())
+    {
+        return;
+    }
+
+    /* Does command line start with quit */
+    quit();
+    /* Does command line is $key = value */
+    if (variable())
+    {
+        return;
+    }
+
+    /* for commands not part of the shell command language */
+    if (fork() == 0)
+    {
+        /* redirection of IO ? */
+        if (redirect)
+        {
+            fd = creat(outfile, 0660);
+            close(STDOUT_FILENO);
+            dup(fd);
+            close(fd);
+            /* stdout is now redirected */
+        }
+        if (concat)
+        {
+            fd = open(outfile, O_RDWR | O_CREAT | O_APPEND, 0660);
+            close(STDOUT_FILENO);
+            dup(fd);
+            close(fd);
+            /* stdout is now redirected */
+        }
+        if (outerr)
+        {
+            // redirect to stderr
+            fd = creat(outfile, 0660);
+            close(STDERR_FILENO);
+            dup(fd);
+            close(fd);
+            /* stderr is now redirected */
+            execvp(argv1[0], argv1);
+        }
+        // if (got_pipe)
+        // {
+        //     return;
+        // pipe(fildes);
+        // if (fork() == 0)
+        // {
+        //     /* first component of command line */
+        //     close(STDOUT_FILENO);
+        //     dup(fildes[1]);
+        //     close(fildes[1]);
+        //     close(fildes[0]);
+        //     /* stdout now goes to pipe */
+        //     /* child process does command */
+        //     execvp(argv1[0], argv1);
+        // }
+        // /* 2nd command component of command line */
+        // close(STDIN_FILENO);
+        // dup(fildes[0]);
+        // close(fildes[0]);
+        // close(fildes[1]);
+        // /* standard input now comes from pipe */
+        // execvp(pipe_command[0][0], pipe_command[0]);
+        // }
+        else
+            execvp(argv1[0], argv1);
+    }
+    /* parent continues over here... */
+    /* waits for child to exit if required */
+    if (amper == false)
+        retid = wait(&status);
+    return;
+}
+
 int main()
 {
-    int ans;
     first_index = 0, last_index = 0;
     signal(SIGINT, sigintHandler);
     while (true)
@@ -374,151 +528,6 @@ int main()
         fgets(command, 1024, stdin);
         command[strlen(command) - 1] = '\0';
         numOfPipes = 0;
-
-        /* parse command line */
-        parseCommandLine();
-
-        /* Is command empty */
-        if (argv1[0] == NULL)
-            continue;
-
-        /* Is command is !! check the last command and do it again */
-        if (argc == 1 && !strcmp(argv1[0], "!!"))
-        {
-            if (history[first_index] == NULL)
-            {
-                printf("there is no history to the shell \n");
-            }
-            else
-            {
-                int index = (last_index - 1) % 20;
-                memset(command, 0, sizeof(command));
-                strcpy(command, history[index]);
-                parseCommandLine();
-            }
-        }
-
-        ans = search_history();
-        if (ans == 1)
-        {
-            continue;
-        }
-
-        add_to_history();
-        /* Does command contain pipe */
-        check_piping();
-
-        /* Does command line end with & */
-        check_amper();
-
-        /* Does command line end with > */
-        redirection();
-
-        /* Does command line end with 2> */
-        handel_stderr();
-
-        /* Does command line start with prompt */
-        ans = change_cursor();
-        if (ans == 1)
-        {
-            continue;
-        }
-
-        /* Does command line start with read */
-        ans = read_command();
-        if (ans == 1)
-        {
-            continue;
-        }
-
-        /* Does command line start with echo */
-        ans = echo();
-        if (ans == 1)
-        {
-            continue;
-        }
-
-        /* Does command line start with cd */
-        ans = cd();
-        if (ans == 1)
-        {
-            continue;
-        }
-
-        /* Does command line start with quit */
-        quit();
-        /* Does command line is $key = value */
-        ans = variable();
-        if (ans == 1)
-        {
-            continue;
-        }
-
-        ans = search_history();
-        if (ans == 1)
-        {
-            continue;
-        }
-
-        /* for commands not part of the shell command language */
-        if (fork() == 0)
-        {
-            /* redirection of IO ? */
-            if (redirect)
-            {
-                fd = creat(outfile, 0660);
-                close(STDOUT_FILENO);
-                dup(fd);
-                close(fd);
-                /* stdout is now redirected */
-            }
-            if (concat)
-            {
-                fd = open(outfile, O_RDWR | O_CREAT | O_APPEND, 0660);
-                close(STDOUT_FILENO);
-                dup(fd);
-                close(fd);
-                /* stdout is now redirected */
-            }
-            if (outerr)
-            {
-                // redirect to stderr
-                fd = creat(outfile, 0660);
-                close(STDERR_FILENO);
-                dup(fd);
-                close(fd);
-                /* stderr is now redirected */
-                execvp(argv1[0], argv1);
-            }
-            if (got_pipe)
-            {
-                continue;
-                // pipe(fildes);
-                // if (fork() == 0)
-                // {
-                //     /* first component of command line */
-                //     close(STDOUT_FILENO);
-                //     dup(fildes[1]);
-                //     close(fildes[1]);
-                //     close(fildes[0]);
-                //     /* stdout now goes to pipe */
-                //     /* child process does command */
-                //     execvp(argv1[0], argv1);
-                // }
-                // /* 2nd command component of command line */
-                // close(STDIN_FILENO);
-                // dup(fildes[0]);
-                // close(fildes[0]);
-                // close(fildes[1]);
-                // /* standard input now comes from pipe */
-                // execvp(pipe_command[0][0], pipe_command[0]);
-            }
-            else
-                execvp(argv1[0], argv1);
-        }
-        /* parent continues over here... */
-        /* waits for child to exit if required */
-        if (amper == false)
-            retid = wait(&status);
+        execute();
     }
 }
