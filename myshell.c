@@ -355,7 +355,7 @@ int search_history()
             {
                 printf("\033[1A"); // line up
                 printf("\x1b[2K"); // delete line
-                getchar();
+                getchar();         // remove [
                 switch (getchar())
                 {
                 case 'A': /* UP arrow */
@@ -398,6 +398,65 @@ int search_history()
                 execute();
                 current_index = (last_index - 1) % 20;
                 printf("%s", history[current_index]);
+            }
+        }
+    }
+    return ans;
+}
+
+int if_statement()
+{
+    int ans = 0;
+    char cut_command[1024];
+    char direct[] = " > /dev/null";
+    if (argc > 1 && !strcmp(argv1[0], "if"))
+    {
+        strcpy(cut_command, &command[3]); /* save the string without the if in cut_command*/
+        strcat(cut_command, direct);      /* add to the cut command string the file direct*/
+        fgets(command, 1024, stdin);      /* get a new input from the user - we need it to be "then"*/
+        command[strlen(command) - 1] = 0; /* remove the last char "\n"*/
+        if (strcmp(command, "then") == 0) /* if the next input from the user is then - activate*/
+        {
+            ans = 1;
+            memset(command, 0, sizeof(command)); /* reset command*/
+            strcpy(command, cut_command);        /*copy to command the cut command + direct*/
+            status = system(command);            /* run the command in the execute function*/
+            fgets(command, 1024, stdin);
+            command[strlen(command) - 1] = 0;
+            if (status == 0)
+            { /* if status is equal to zero - do everything until fi or else*/
+                while ((strcmp(command, "else") != 0) && (strcmp(command, "fi") != 0))
+                {
+                    execute();
+                    fgets(command, 1024, stdin);
+                    command[strlen(command) - 1] = 0;
+                }
+                if (strcmp(command, "else") == 0)
+                {
+                    while (strcmp(command, "fi") != 0)
+                    {
+                        fgets(command, 1024, stdin);
+                        command[strlen(command) - 1] = 0;
+                    }
+                }
+            }
+            else
+            {
+                /* if status is not equal to zero - skip until else and then do everything until fi*/
+                while ((strcmp(command, "else") != 0) && (strcmp(command, "fi") != 0))
+                {
+                    fgets(command, 1024, stdin);
+                    command[strlen(command) - 1] = 0;
+                }
+                if (strcmp(command, "else") == 0)
+                {
+                    while (strcmp(command, "fi") != 0)
+                    {
+                        execute();
+                        fgets(command, 1024, stdin);
+                        command[strlen(command) - 1] = 0;
+                    }
+                }
             }
         }
     }
@@ -475,6 +534,11 @@ void execute()
     quit();
     /* Does command line is $key = value */
     if (variable())
+    {
+        return;
+    }
+    /* Does command line start with if statement */
+    if (if_statement())
     {
         return;
     }
