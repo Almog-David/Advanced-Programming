@@ -13,7 +13,7 @@
 char command[1024];
 char copy_command[1024];
 char *history[20];
-char *token;
+char *token; 
 char *outfile;
 bool amper, redirect, retid, got_pipe, outerr, concat;
 int i, status, argc, fd, first_index, last_index, numOfPipes;
@@ -57,7 +57,7 @@ void check_amper()
         amper = false;
 }
 
-/* this function add the last commans to the history array in order to let us see the last command or go through them*/
+/* This function add the last commans to the history array in order to let us see the last command or go through them*/
 void add_to_history()
 {
     int index = last_index % 20;
@@ -190,7 +190,7 @@ void quit()
     }
 }
 
-/* a function that run over the current signal SIGTSTP*/
+/* A function that run over the current signal SIGTSTP*/
 void stop_signal()
 {
     return;
@@ -469,7 +469,7 @@ int if_statement()
     }
     return ans;
 }
-/* check and execute all the command's types we have*/
+/* Check and execute all the command's types we have*/
 void execute()
 {
     /* parse command line */
