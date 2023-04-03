@@ -1,5 +1,5 @@
 # Custome-Linux-Shell
-This repository is an assignment for Operating Systems Course in Ariel university. The assignment is to create a simple linux shell as per the assignment instrutions which requiered to implement some of my own builtin CL commands for Linux using fork() and exec().  
+This repository is an assignment for Advanced Programming Course in Ariel university. The assignment is to create a simple linux shell as per the assignment instrutions which requiered to implement some of my own builtin CL commands for Linux using fork() and exec().  
 The assingment is written in C programming language
 
 ## How to run:
