@@ -24,6 +24,7 @@ int main();
 
 void execute();
 
+/*This function is parsing the command and save it's words in argv1 + count number of pipes*/
 void parseCommandLine()
 {
     got_pipe = false;
@@ -60,13 +61,12 @@ void check_amper()
 void add_to_history()
 {
     int index = last_index % 20;
-    if (history[index] == NULL)
+    if (history[index] == NULL) /* if it's one of the first 20 commands*/
     {
-        /* this doesnt work because its saves only the first word*/
         history[index] = strdup(copy_command);
         last_index = (last_index + 1) % 20;
     }
-    else
+    else /* we need to delete the old command and insert the new one*/
     {
         free(history[index]);
         history[index] = strdup(copy_command);
@@ -99,7 +99,7 @@ void redirection()
     }
 }
 
-/* This function is handeling the writing to the stderr file*/
+/* This function is Redirecting the stderr output of the command to a file.*/
 void handel_stderr()
 {
     if (argc > 1 && !strcmp(argv1[argc - 2], "2>"))
@@ -190,6 +190,7 @@ void quit()
     }
 }
 
+/* a function that run over the current signal SIGTSTP*/
 void stop_signal()
 {
     return;
@@ -209,55 +210,60 @@ void sigintHandler()
 /* This function is handeling the | (piping) command*/
 void piping()
 {
-    int prev_pipe = STDIN_FILENO;
-    for (i = 0; i < numOfPipes; i++)
+    if (fork() == 0)
     {
-        pipe(fildes);
-        if (fork() == 0)
+        int prev_pipe = STDIN_FILENO;
+        for (i = 0; i < numOfPipes; i++)
         {
-            // Redirect previous pipe to stdin
-            if (prev_pipe != STDIN_FILENO)
+            pipe(fildes);
+            if (fork() == 0)
             {
-                dup2(prev_pipe, STDIN_FILENO);
-                close(prev_pipe);
-            }
+                // Redirect previous pipe to stdin
+                if (prev_pipe != STDIN_FILENO)
+                {
+                    dup2(prev_pipe, STDIN_FILENO);
+                    close(prev_pipe);
+                }
 
-            // Redirect stdout to current pipe
-            dup2(fildes[1], STDOUT_FILENO);
+                // Redirect stdout to current pipe
+                dup2(fildes[1], STDOUT_FILENO);
+                close(fildes[1]);
+
+                // Start command
+                if (execvp(pipe_command[i][0], pipe_command[i]) == -1)
+                {
+                    fprintf(stderr, "Error executing command: %s\n", strerror(errno));
+                    _exit(1);
+                }
+            }
+            // Close read end of previous pipe (not needed in the parent)
+            close(prev_pipe);
+
+            // Close write end of current pipe (not needed in the parent)
             close(fildes[1]);
 
-            // Start command
-            if (execvp(pipe_command[i][0], pipe_command[i]) == -1)
-            {
-                fprintf(stderr, "Error executing command: %s\n", strerror(errno));
-                _exit(1);
-            }
+            // Save read end of current pipe to use in next iteration
+            prev_pipe = fildes[0];
+        }
+        // Get stdin from last pipe
+        if (prev_pipe != STDIN_FILENO)
+        {
+            dup2(prev_pipe, STDIN_FILENO);
+            close(prev_pipe);
         }
 
-        // Close read end of previous pipe (not needed in the parent)
-        close(prev_pipe);
-
-        // Close write end of current pipe (not needed in the parent)
-        close(fildes[1]);
-
-        // Save read end of current pipe to use in next iteration
-        prev_pipe = fildes[0];
+        // Start last command
+        if (execvp(pipe_command[i][0], pipe_command[i]) == -1)
+        {
+            fprintf(stderr, "Error executing command: %s\n", strerror(errno));
+            exit(1);
+        }
     }
-    // Get stdin from last pipe
-    if (prev_pipe != STDIN_FILENO)
-    {
-        dup2(prev_pipe, STDIN_FILENO);
-        close(prev_pipe);
-    }
-
-    // Start last command
-    if (execvp(pipe_command[i][0], pipe_command[i]) == -1)
-    {
-        fprintf(stderr, "Error executing command: %s\n", strerror(errno));
-        exit(1);
-    }
+    if (amper == false)
+        retid = wait(&status);
 }
 
+/* This function check if we got pipe and split the command to sectors*/
 void check_piping()
 {
     if (numOfPipes > 0)
@@ -291,7 +297,7 @@ void check_piping()
         }
         pipe_command[row][colm] = NULL;
         piping();
-
+        /* free the pipe_command memory */
         for (int i = 0; i < max_rows; i++)
         {
             for (int j = 0; j < max_colm; j++)
@@ -335,7 +341,7 @@ int read_command()
     }
     return 0;
 }
-
+/* This function allow you to go through the command history */
 int search_history()
 {
     int current_index = (last_index - 1) % 20;
@@ -404,6 +410,7 @@ int search_history()
     return ans;
 }
 
+/* This function is handeling the if statement */
 int if_statement()
 {
     int ans = 0;
@@ -462,7 +469,7 @@ int if_statement()
     }
     return ans;
 }
-
+/* check and execute all the command's types we have*/
 void execute()
 {
     /* parse command line */
