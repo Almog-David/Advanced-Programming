@@ -13,9 +13,9 @@
 char command[1024];
 char copy_command[1024];
 char *history[20];
-char *token; 
+char *token;
 char *outfile;
-bool amper, redirect, retid, got_pipe, outerr, concat;
+bool amper, redirect, retid, outerr, concat;
 int i, status, argc, fd, first_index, last_index, numOfPipes;
 int fildes[2];
 char *argv1[10], ***pipe_command;
@@ -27,7 +27,6 @@ void execute();
 /*This function is parsing the command and save it's words in argv1 + count number of pipes*/
 void parseCommandLine()
 {
-    got_pipe = false;
     i = 0;
     strcpy(copy_command, command);
     token = strtok(command, " ");
@@ -37,7 +36,6 @@ void parseCommandLine()
         token = strtok(NULL, " ");
         if (token && !strcmp(token, "|"))
         {
-            got_pipe = true;
             numOfPipes++;
         }
     }
@@ -418,16 +416,16 @@ int if_statement()
     char direct[] = " > /dev/null";
     if (argc > 1 && !strcmp(argv1[0], "if"))
     {
-        strcpy(cut_command, &command[3]); /* save the string without the if in cut_command*/
-        strcat(cut_command, direct);      /* add to the cut command string the file direct*/
-        fgets(command, 1024, stdin);      /* get a new input from the user - we need it to be "then"*/
-        command[strlen(command) - 1] = 0; /* remove the last char "\n"*/
-        if (strcmp(command, "then") == 0) /* if the next input from the user is then - activate*/
+        strcpy(cut_command, copy_command + 3); /* save the string without the if in cut_command*/
+        strcat(cut_command, direct);           /* add to the cut command string the file direct*/
+        fgets(command, 1024, stdin);           /* get a new input from the user - we need it to be "then"*/
+        command[strlen(command) - 1] = 0;      /* remove the last char "\n"*/
+        if (strcmp(command, "then") == 0)      /* if the next input from the user is then - activate*/
         {
             ans = 1;
             memset(command, 0, sizeof(command)); /* reset command*/
             strcpy(command, cut_command);        /*copy to command the cut command + direct*/
-            status = system(command);            /* run the command in the execute function*/
+            execute();                           /* run the command in the execute function*/
             fgets(command, 1024, stdin);
             command[strlen(command) - 1] = 0;
             if (status == 0)

@@ -1,0 +1,44 @@
+hello: date >> example
+hello: cat example
+hello: date -u >> example
+hello: ls -l | wc -l
+hello: prompt = test: 
+test: $student = 207749441
+test: echo student id is $student
+test: mkdir files
+test: cd files
+test: pwd
+test: cat > colors.txt
+blue 
+black
+red 
+red
+green
+blue
+green
+yellow
+yellow
+blue
+blue
+yellow 
+test: cat colors.txt
+test: sort colors.txt | uniq -c | sort -r | head -3
+test: prompt = func: 
+func: echo Enter a string 
+read name
+myshell
+func: echo the name of the assignment is $name
+func: echo abc xyz
+func: echo $?
+func: !!   
+func: if ls -l
+then
+echo the if else is working
+echo good job
+else
+echo the if else is not working
+just kidding
+fi       
+func: echo this is the end of the test
+func: Control-C
+func: quit
