@@ -414,11 +414,9 @@ int if_statement()
 {
     int ans = 0;
     char cut_command[1024];
-    char direct[] = " > /dev/null";
     if (argc > 1 && !strcmp(argv1[0], "if"))
     {
         strcpy(cut_command, copy_command + 3); /* save the string without the if in cut_command*/
-        strcat(cut_command, direct);           /* add to the cut command string the file direct*/
         fgets(command, 1024, stdin);           /* get a new input from the user - we need it to be "then"*/
         command[strlen(command) - 1] = 0;      /* remove the last char "\n"*/
         if (strcmp(command, "then") == 0)      /* if the next input from the user is then - activate*/
@@ -471,6 +469,7 @@ int if_statement()
 /* Check and execute all the command's types we have*/
 void execute()
 {
+    numOfPipes = 0;
     /* parse command line */
     parseCommandLine();
 
@@ -500,6 +499,7 @@ void execute()
     }
 
     add_to_history();
+
     /* Does command contain pipe */
     check_piping();
 
@@ -545,6 +545,10 @@ void execute()
     }
     /* Does command line start with if statement */
     if (if_statement())
+    {
+        return;
+    }
+    if (numOfPipes > 0)
     {
         return;
     }
@@ -598,7 +602,6 @@ int main()
         printf("%s ", cursor);
         fgets(command, 1024, stdin);
         command[strlen(command) - 1] = '\0';
-        numOfPipes = 0;
         execute();
     }
 }
