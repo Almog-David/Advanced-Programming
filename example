@@ -37,7 +37,7 @@ echo the if else is working
 echo good job
 else
 echo the if else is not working
-just kidding
+echo just kidding
 fi       
 func: echo this is the end of the test
 func: Control-C

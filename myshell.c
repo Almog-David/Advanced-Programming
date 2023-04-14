@@ -234,6 +234,7 @@ void piping()
                     _exit(1);
                 }
             }
+
             // Close read end of previous pipe (not needed in the parent)
             close(prev_pipe);
 
@@ -251,7 +252,7 @@ void piping()
         }
 
         // Start last command
-        if (execvp(pipe_command[i][0], pipe_command[i]) == -1)
+        if (execvp(pipe_command[numOfPipes][0], pipe_command[numOfPipes]) == -1)
         {
             fprintf(stderr, "Error executing command: %s\n", strerror(errno));
             exit(1);
